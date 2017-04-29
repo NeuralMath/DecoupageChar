@@ -19,7 +19,7 @@ public class MainActivity extends AppCompatActivity {
         TextView t = (TextView) findViewById(R.id.bob);
 
         try {
-            ImageDecoder imageDecoder = new ImageDecoder(0, 0, 0, 0, null, null);
+            ImageDecoder imageDecoder = new ImageDecoder(this, 0, 0, 0, 0, null, null);
             t.setText(imageDecoder.findSting(resize(BitmapFactory.decodeResource(getResources(), R.drawable.exposant), 200, 100)));
         }
         catch (IOException ex)

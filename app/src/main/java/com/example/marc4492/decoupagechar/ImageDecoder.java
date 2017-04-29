@@ -1,11 +1,16 @@
 package com.example.marc4492.decoupagechar;
 
+import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.widget.Toast;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 /**
  * Class qui contient le réseau de neurones et qui obtient l'équation en string
@@ -17,9 +22,12 @@ import java.util.ArrayList;
 public class ImageDecoder {
     private ArrayList<MathChar> listChar;
     private String[] charList;
+    private int index = 0;
 
     private int totalWidth;
     private int totalHeight;
+
+    private Context context;
 
     /**
      * Contructeur qui initialise le réseau
@@ -32,7 +40,9 @@ public class ImageDecoder {
      *
      * @throws IOException S'il y a des problèmes de fichier, ...
      */
-    public ImageDecoder(final int input, final int hidden, final int output, final double training, final SQLiteDatabase database, String[] charListing) throws IOException {
+    public ImageDecoder(Context c, final int input, final int hidden, final int output, final double training, final SQLiteDatabase database, String[] charListing) throws IOException {
+        context = c;
+
         listChar = new ArrayList<>();
         charList = charListing;
     }
@@ -54,64 +64,49 @@ public class ImageDecoder {
 
         //Split tous les chars
         splitChar(btm);
-        int index = 0;
-        //Add le char dans l'eq
-        for (int i = 0; i < listChar.size(); i++) {
-            MathChar firstVSplitChar = listChar.get(i);
 
-            //mC : chaque horizontal dans valTemp
-            for (int j = 0; j < firstVSplitChar.getListInner().size(); j++) {
-                MathChar hSplitFromFirstV = firstVSplitChar.getListInner().get(j);
-                //Juste un à l'horizontal
-                if(hSplitFromFirstV.getListInner().size() == 0)
-                {
-                    hSplitFromFirstV.setValue(String.valueOf(index));
-                    index++;
-
-                    if(i > 0) {
-                        //get 0 cause probleme
-                        //height pas bonne idée
-                        if (hSplitFromFirstV.getHeight() <= listChar.get(i-1).getListInner().get(0).getHeight()) {
-                            if(line.charAt(line.length()-1) == ')')
-                                line = line.substring(0, line.length()-1) + hSplitFromFirstV.getValue() + ")";
-                            else
-                                line += "^(" + hSplitFromFirstV.getValue() + ")";
-                        }
-                    }
-                    else
-                        line += hSplitFromFirstV.getValue();
-                }
-                else {
-                    //Toute les verticals de l'horizontal
-                    for (int k = 0; k < hSplitFromFirstV.getListInner().size(); k++) {
-                        MathChar vSplitFromHFromV = hSplitFromFirstV.getListInner().get(k);
-
-                        if (vSplitFromHFromV.getListInner().size() == 0) {
-                            vSplitFromHFromV.setValue(String.valueOf(index));
-                            index++;
-                            //EXP et non fraction (voir cas speciaux exp multiple)
-                            if (firstVSplitChar.getListInner().size() < 3) {
-                                if (j + 1 < firstVSplitChar.getListInner().size()) {
-                                    firstVSplitChar.getListInner().get(j + 1).setValue(String.valueOf(index));
-                                    index++;
-                                    j++;
-
-                                    if(vSplitFromHFromV.getXStart() > firstVSplitChar.getListInner().get(j).getXStart())
-                                        line += firstVSplitChar.getListInner().get(j).getValue() + "^(" + vSplitFromHFromV.getValue() + ")";
-                                    else
-                                        line += vSplitFromHFromV.getValue() + "_(" + firstVSplitChar.getListInner().get(j).getValue() + ")";
-                                }
-                            }
-                            else
-                            {
-                                //TO DO check si fration ou x_()^()
-                            }
-                        }
-                    }
-                }
+        Collections.sort(listChar, new Comparator<MathChar>() {
+            @Override
+            public int compare(MathChar mathChar, MathChar t1) {
+                return mathChar.getXStart() - t1.getXStart();
             }
+        });
+
+        final int toleranceHeight = (int) (totalHeight *0.1);
+        final int toleranceWidth = (int) (totalWidth*0.1);
+        boolean notCheckingLast = false;
+        int indexToLook = 0;
+
+        for(int i = 0; i < listChar.size(); i++)
+            listChar.get(i).setValue(String.valueOf(i));
+
+        line += listChar.get(0).getValue();
+
+        for(index = 1; index < listChar.size(); index++)
+        {
+            if(!notCheckingLast)
+                indexToLook = index - 1;
+
+            //Si un à côté de l'autre
+            if(Math.abs(listChar.get(indexToLook).getYEnd() - listChar.get(index).getYEnd()) <= toleranceHeight ) {
+                notCheckingLast = false;
+                line += listChar.get(index).getValue();
+            }
+
+            //Si un exposant
+            else if(listChar.get(index).getYEnd() <= listChar.get(indexToLook).getYMiddle()) {
+                notCheckingLast = true;
+                line = findExposant(line, toleranceHeight);
+            }
+
+            //Si un indice
+            else if(listChar.get(index).getYStart() > listChar.get(indexToLook).getYMiddle()) {
+                notCheckingLast = true;
+                line = findIndice(line, toleranceHeight);
+            }
+            else
+                Toast.makeText(context, "Le découpage ne peut pas s'effectuer correctement", Toast.LENGTH_LONG).show();
         }
-        //line += replaceChar();
 
         return line;
     }
@@ -127,6 +122,51 @@ public class ImageDecoder {
         MathChar mC = new MathChar(btm, 0, 0, btm.getWidth(), btm.getHeight());
         mC.splitChar(true);
         listChar.addAll(mC.getStaticList());
+    }
+
+
+    public String findExposant(String line,  int toleranceHeight)
+    {
+        line += "^(" + listChar.get(index).getValue();
+        if(index < listChar.size()-1) {
+            index++;
+            while (index < listChar.size()) {
+                if(Math.abs(listChar.get(index - 1).getYEnd() - listChar.get(index).getYEnd()) <= toleranceHeight)
+                    line += listChar.get(index).getValue();
+                else if(listChar.get(index).getYEnd() <= listChar.get(index-1).getYMiddle())
+                    line = findExposant(line, toleranceHeight);
+                else {
+                    index--;
+                    break;
+                }
+                index++;
+            }
+        }
+        line += ")";
+
+        return line;
+    }
+
+    public String findIndice(String line,  int toleranceHeight)
+    {
+        line += "_(" + listChar.get(index).getValue();
+        if(index < listChar.size()-1) {
+            index++;
+            while (index < listChar.size()) {
+                if(Math.abs(listChar.get(index - 1).getYEnd() - listChar.get(index).getYEnd()) <= toleranceHeight)
+                    line += listChar.get(index).getValue();
+                else if(listChar.get(index).getYStart() > listChar.get(index -1).getYMiddle())
+                    line = findIndice(line, toleranceHeight);
+                else {
+                    index--;
+                    break;
+                }
+                index++;
+            }
+        }
+        line += ")";
+
+        return line;
     }
 
     /**
@@ -160,95 +200,39 @@ public class ImageDecoder {
         return inputValues;
     }
 
-    public String replaceChar()
+    private Bitmap fillImage(Bitmap btm)
     {
+        int width = btm.getWidth();
+        int height = btm.getHeight();
 
-        //TO DO
-        //Checker avec Godefroy pour les x_1, x_2
-        //Check si exposant contient plus qu'un char
+        int borderSize = 5;
 
+        Bitmap newImage;
+        Canvas canvas;
 
-        //Tolerance de 5%
-        final int toleranceHeight = (int) (totalHeight *0.05);
-        final int toleranceWidth = (int) (totalWidth*0.05);
-        String buildedEq = listChar.get(0).getValue();
-
-        //get le premier char
-        for(int i = 1; i < listChar.size()-1; i++) {
-
-            //Donc un apres lautre
-            /*if (listChar.get(i).getXEnd() < listChar.get(i + 1).getXStart()) {
-                //S'il sont assez proche pour etre des exp/ind
-                if (listChar.get(i + 1).getXStart() - listChar.get(i).getXEnd() < toleranceWidth) {
-                    //TO DO
-                    //Insert tolerance
-                    if (listChar.get(i + 1).getYStart() < listChar.get(i).getYStart()) {
-                        buildedEq += listChar.get(i).getValue() + "^(" + listChar.get(i + 1).getValue() + ")";
-                    } else if (listChar.get(i + 1).getYStart() > listChar.get(i).getYStart()) {
-                        buildedEq += listChar.get(i).getValue() + "_(" + listChar.get(i + 1).getValue() + ")";
-                    }
-                } else {
-                    //Si c'est l'avant dernier, ajouter les deux
-                    if(i+2 == listChar.size())
-                        buildedEq += listChar.get(i).getValue() + "," + listChar.get(i+1).getValue();
-                    else
-                        buildedEq += listChar.get(i).getValue();
-                }
-            }
-            //Donc un par dessus l'autre
-            else {
-                if (listChar.get(i + 1).getXStart() < listChar.get(i).getXStart()) {
-                    if (listChar.get(i + 1).getYStart() > listChar.get(i).getYStart()) {
-                        buildedEq += listChar.get(i + 1).getValue() + "^(" + listChar.get(i).getValue() + ")";
-                    }
-                } else if (listChar.get(i + 1).getXStart() > listChar.get(i).getXStart()) {
-                    if (listChar.get(i + 1).getYStart() > listChar.get(i).getYStart()) {
-                        buildedEq += listChar.get(i).getValue() + "_(" + listChar.get(i + 1).getValue() + ")";
-                    }
-                }*/
-
-
-            if (listChar.get(i).getTop() != null) {
-                String temp = listChar.get(i).getValue() + "^(" + listChar.get(i).getTop().getValue();
-                while (listChar.get(i).getTop().getRight() != null) {
-                    temp += listChar.get(i).getTop().getRight().getValue();
-                    i++;
-                }
-                temp += ")";
-                buildedEq += temp;
-            } else if (listChar.get(i).getRight() != null)
-                buildedEq += listChar.get(i).getRight().getValue();
-
-
+        if(width < height)
+        {
+            newImage = Bitmap.createBitmap(height + 2*borderSize, height + 2*borderSize, btm.getConfig());
+            canvas = new Canvas(newImage);
+            canvas.drawColor(Color.WHITE);
+            canvas.drawBitmap(btm, (newImage.getWidth()-width)/2, borderSize, null);
+            return newImage;
         }
-
-
-        /*{
-            //Litteralement char2 dessus char
-            if(listChar.get(i-1).getXStart() - toleranceWidth < listChar.get(i).getXStart() && listChar.get(i-1).getXStart() + toleranceWidth > listChar.get(i).getXStart())
-            {
-                buildedEq += "(" + listChar.get(i).getValue() + "," + listChar.get(i-1).getValue() + ")";
-            }
-            //Si char2 est par dessus char mais pas au complet
-            else if(listChar.get(i-1).getXStart() + listChar.get(i-1).getWidth() + toleranceWidth > listChar.get(i).getXStart() - toleranceWidth)
-            {
-                //TO DO
-                //Fraction
-
-                if(listChar.get(i-1).getYStart() < listChar.get(i).getYStart())
-                    buildedEq += "_(" + listChar.get(i).getValue() + ")";
-                else
-                    buildedEq += "^(" + listChar.get(i).getValue() + ")";
-            }
-            //Un a cote de lautre
-            if(listChar.get(i-1).getXStart() + listChar.get(i-1).getWidth() + toleranceWidth < listChar.get(i).getXStart() - toleranceWidth)
-            {
-                buildedEq += listChar.get(i).getValue();
-            }
-        }*/
-
-        //TO DO
-        //Call post treatment
-        return buildedEq;
+        else if (height < width)
+        {
+            newImage = Bitmap.createBitmap(width + 2*borderSize, width + 2*borderSize, btm.getConfig());
+            canvas = new Canvas(newImage);
+            canvas.drawColor(Color.WHITE);
+            canvas.drawBitmap(btm, borderSize, (newImage.getHeight()-height)/2, null);
+            return newImage;
+        }
+        else
+        {
+            newImage = Bitmap.createBitmap(width + 2*borderSize, height + 2*borderSize, btm.getConfig());
+            canvas = new Canvas(newImage);
+            canvas.drawColor(Color.WHITE);
+            canvas.drawBitmap(btm, borderSize, borderSize, null);
+            return newImage;
+        }
     }
 }

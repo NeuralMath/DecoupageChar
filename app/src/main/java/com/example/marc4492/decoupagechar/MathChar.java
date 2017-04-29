@@ -14,13 +14,12 @@ public class MathChar {
     private int yStart = 0;
     private int xEnd;
     private int yEnd;
+    private int xMiddle;
+    private int yMiddle;
     private int width = 0;
     private int height = 0;
 
-    private String value ="";
-
-    private MathChar right = null;
-    private MathChar top = null;
+    private String value = "";
 
     private ArrayList<MathChar> listInner = new ArrayList<>();
     private static ArrayList<MathChar> listFinal = new ArrayList<>();
@@ -29,8 +28,13 @@ public class MathChar {
         image = b;
         xStart = x;
         yStart = y;
+
         xEnd = x + w;
         yEnd = y + h;
+
+        xMiddle = (xStart + xEnd)/2;
+        yMiddle = (yStart + yEnd)/2;
+
         width = w;
         height = h;
     }
@@ -41,10 +45,6 @@ public class MathChar {
 
     public ArrayList<MathChar> getStaticList() {
         return listFinal;
-    }
-
-    public ArrayList<MathChar> getListInner() {
-        return listInner;
     }
 
     public void setValue(String value) {
@@ -80,14 +80,13 @@ public class MathChar {
         return height;
     }
 
-    public MathChar getRight() {
-        return right;
+    public int getXMiddle() {
+        return xMiddle;
     }
 
-    public MathChar getTop() {
-        return top;
+    public int getYMiddle() {
+        return yMiddle;
     }
-
 
     /**
      * Split toutes les char dans l'image
@@ -95,21 +94,15 @@ public class MathChar {
      * @throws IOException  S'il y a des problemes avec le splitage
      */
     public void splitChar(boolean vertical) throws IOException {
-        if (vertical) {
+        if (vertical)
             splitVertical();
-            if (right != null)
-                right.splitChar(false);
-        }
-        else {
+        else
             splitHorizontal();
-            if(top != null)
-                top.splitChar(true);
-        }
         if(listInner.size() == 0)
             listFinal.add(this);
-        /*else
+        else
             for (MathChar mC : listInner)
-                mC.splitChar(!vertical);*/
+                mC.splitChar(!vertical);
     }
 
 
@@ -152,22 +145,18 @@ public class MathChar {
                 while(i < listBlack.size() && listBlack.get(i) - listBlack.get(i-1) == 1)
                     i++;
 
-                newWidth = listBlack.get(i-1)-start;
+                if(listBlack.get(i-1) != 0)
+                    newWidth = listBlack.get(i-1)-start;
+                else
+                    newWidth = listBlack.get(i);
 
                 newSplitChar = new MathChar(crop(image, start, 0, newWidth, image.getHeight()), start + xStart, yStart, newWidth, image.getHeight());
 
-                /*if(listFinal.size() != 0)
-                    listFinal.get(listFinal.size()-1).top = newSplitChar;*/
-
                 listInner.add(newSplitChar);
 
-                if(i < listBlack.size())
+                if(i < listBlack.size()-1)
                     start = listBlack.get(i);
                 i++;
-            }
-
-            for(int j = listInner.size()-1; j > 0; j--) {
-                listInner.get(j - 1).right = listInner.get(j);
             }
         }
     }
@@ -209,21 +198,18 @@ public class MathChar {
                 while(i < listBlack.size() && listBlack.get(i) - listBlack.get(i-1) == 1)
                     i++;
 
-                newHeight = listBlack.get(i-1)-start;
+                if(listBlack.get(i-1) != 0)
+                    newHeight = listBlack.get(i-1)-start;
+                else
+                    newHeight = listBlack.get(i);
 
                 newSplitChar = new MathChar(crop(image, 0, start,image .getWidth(), newHeight), xStart, start + yStart, image.getWidth(), newHeight);
-
-                /*if(listFinal.size() != 0)
-                    listFinal.get(listFinal.size()-1).right = newSplitChar;*/
 
                 listInner.add(newSplitChar);
 
                 if(i < listBlack.size())
                     start = listBlack.get(i);
                 i++;
-            }
-            for(int j = listInner.size()-1; j > 0; j--) {
-                listInner.get(j - 1).top = listInner.get(j);
             }
         }
     }
