@@ -105,7 +105,7 @@ public class ImageDecoder {
                 line = findIndice(line, toleranceHeight);
             }
             else
-                Toast.makeText(context, "Le découpage ne peut pas s'effectuer correctement", Toast.LENGTH_LONG).show();
+                Toast.makeText(context, "Le découpage de caractère ne s'est pas déroulé normalement", Toast.LENGTH_LONG).show();
         }
 
         return line;
