@@ -19,18 +19,22 @@ public class MathChar {
     private int width = 0;
     private int height = 0;
 
+    private boolean isInFraction = false;
+
     private String value = "";
 
     private ArrayList<MathChar> listInner = new ArrayList<>();
     private static ArrayList<MathChar> listFinal = new ArrayList<>();
 
-    public MathChar(Bitmap b, int x, int y, int w, int h) {
+    public MathChar(Bitmap b, int x, int y, int w, int h, boolean isFrac) {
         image = b;
         xStart = x;
         yStart = y;
 
         xEnd = x + w;
         yEnd = y + h;
+
+        isInFraction = isFrac;
 
         xMiddle = (xStart + xEnd)/2;
         yMiddle = (yStart + yEnd)/2;
@@ -88,21 +92,31 @@ public class MathChar {
         return yMiddle;
     }
 
+    public boolean getIsInFraction() {
+        return isInFraction;
+    }
+
+    public void setIsInFraction(boolean inFraction) {
+        isInFraction = inFraction;
+    }
+
     /**
      * Split toutes les char dans l'image
-     * @param vertical      Si l'on split verticalement ou pas
+     * @param isSplitVertical      Si l'on split verticalement ou pas
      * @throws IOException  S'il y a des problemes avec le splitage
      */
-    public void splitChar(boolean vertical) throws IOException {
-        if (vertical)
+    public void splitChar(boolean isSplitVertical) throws IOException {
+        if (isSplitVertical)
             splitVertical();
         else
             splitHorizontal();
+
+        //Si le découpage est fini
         if(listInner.size() == 0)
             listFinal.add(this);
         else
             for (MathChar mC : listInner)
-                mC.splitChar(!vertical);
+                mC.splitChar(!isSplitVertical);
     }
 
 
@@ -117,10 +131,7 @@ public class MathChar {
     {
         ArrayList<Integer> listBlack = new ArrayList<>();
         int pixel;
-
         int newWidth;
-
-        MathChar newSplitChar;
 
         //Check chaque colonne pour voir si elle est blanche : check si + noir que blanc
         for(int i = 0; i < image.getWidth(); i++) {
@@ -150,9 +161,7 @@ public class MathChar {
                 else
                     newWidth = listBlack.get(i);
 
-                newSplitChar = new MathChar(crop(image, start, 0, newWidth, image.getHeight()), start + xStart, yStart, newWidth, image.getHeight());
-
-                listInner.add(newSplitChar);
+                listInner.add(new MathChar(crop(image, start, 0, newWidth, image.getHeight()), start + xStart, yStart, newWidth, image.getHeight(), isInFraction));
 
                 if(i < listBlack.size()-1)
                     start = listBlack.get(i);
@@ -170,10 +179,7 @@ public class MathChar {
     {
         ArrayList<Integer> listBlack = new ArrayList<>();
         int pixel;
-
         int newHeight;
-
-        MathChar newSplitChar;
 
         //Check chaque colonne pour voir si elle est blanche : check chaque couleurs pour les val hex
         for(int i = 0; i < image.getHeight() ; i++) {
@@ -203,14 +209,17 @@ public class MathChar {
                 else
                     newHeight = listBlack.get(i);
 
-                newSplitChar = new MathChar(crop(image, 0, start,image .getWidth(), newHeight), xStart, start + yStart, image.getWidth(), newHeight);
-
-                listInner.add(newSplitChar);
+                listInner.add(new MathChar(crop(image, 0, start,image .getWidth(), newHeight), xStart, start + yStart, image.getWidth(), newHeight, isInFraction));
 
                 if(i < listBlack.size())
                     start = listBlack.get(i);
                 i++;
             }
+
+            //Probablement une fraction
+            if(listInner.size() > 2)
+                for(MathChar mC : listInner)
+                    mC.isInFraction = true;
         }
     }
 
