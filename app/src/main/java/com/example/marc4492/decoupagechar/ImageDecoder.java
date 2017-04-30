@@ -22,8 +22,8 @@ import java.util.Comparator;
 public class ImageDecoder {
     private String[] charList;
 
-    private int totalWidth;
-    private int totalHeight;
+    private int originalTolWidth;
+    private int originalTolHeight;
 
     private Context context;
 
@@ -53,8 +53,8 @@ public class ImageDecoder {
      */
     public String findSting(Bitmap btm) throws IOException {
         ArrayList<MathChar> listChar;
-        totalHeight = btm.getHeight();
-        totalWidth = btm.getWidth();
+        int totalHeight = btm.getHeight();
+        int totalWidth = btm.getWidth();
 
         //Split tous les chars
         listChar = splitChar(btm);
@@ -67,7 +67,13 @@ public class ImageDecoder {
             }
         });
 
-        return postTreatment(replaceChar(listChar));
+        for(int i = 0; i < listChar.size(); i++)
+            listChar.get(i).setValue(String.valueOf(i));
+
+        originalTolWidth = (int) (totalWidth *0.1);
+        originalTolHeight = (int) (totalHeight *0.1);
+
+        return postTreatment(replaceChar(listChar, originalTolWidth, originalTolHeight));
     }
 
     /**
@@ -76,19 +82,13 @@ public class ImageDecoder {
      * @param listChar      Liste des l'élements à comparer
      * @return              La String résultante
      */
-    private String replaceChar(ArrayList<MathChar> listChar) {
+    private String replaceChar(ArrayList<MathChar> listChar, int toleranceWidth, int toleranceHeight) {
         String line = "";
         //10% de l'image
-        final int toleranceHeight = (int) (totalHeight *0.1);
-        final int toleranceWidth = (int) (totalWidth*0.1);
 
         boolean notCheckingLast = false;
         int indexToLook = 0;
         ArrayList<MathChar> listFraction = new ArrayList<>();
-
-        //Passer dans l'intelligence
-        for(int i = 0; i < listChar.size(); i++)
-            listChar.get(i).setValue(String.valueOf(i));
 
         //si le premier char n'est pas dans un fraction
         int index;
@@ -114,14 +114,13 @@ public class ImageDecoder {
                     listFraction.add(listChar.get(index));
                     index++;
                 }
-                line = findFraction(line, listFraction, toleranceHeight);
-                index--;
+                line = findFraction(line, listFraction, toleranceHeight/2);
+                if(index < listChar.size())
+                    index--;
             }
             //Si un =
             else if(Math.abs(listChar.get(index).getWidth() - listChar.get(indexToLook).getWidth()) < toleranceWidth/2 && Math.abs(listChar.get(index).getXMiddle() - listChar.get(indexToLook).getXMiddle()) < toleranceWidth/2 && Math.abs(listChar.get(index).getYEnd() - listChar.get(indexToLook).getYStart()) < 1.5*toleranceHeight)
-            {
                 line = line.substring(0, line.length()-1) + "=";
-            }
 
             //Si un à côté de l'autre
             else if(isBeside(listChar.get(indexToLook), listChar.get(index), toleranceHeight)) {
@@ -132,13 +131,13 @@ public class ImageDecoder {
             //Si un exposant
             else if(listChar.get(index).getYEnd() <= listChar.get(indexToLook).getYMiddle()) {
                 notCheckingLast = true;
-                line = findExposant(listChar, line, toleranceHeight, index);
+                line = findExposant(listChar, line, toleranceHeight/2, index);
             }
 
             //Si un indice
             else if(listChar.get(index).getYStart() > listChar.get(indexToLook).getYMiddle()) {
                 notCheckingLast = true;
-                line = findIndice(listChar, line, toleranceHeight, index);
+                line = findIndice(listChar, line, toleranceHeight/2, index);
             }
             else
                 Toast.makeText(context, "Le découpage de caractère ne s'est pas déroulé normalement", Toast.LENGTH_LONG).show();
@@ -264,7 +263,6 @@ public class ImageDecoder {
 
         //Tri up down de la ligne de fraction
         for(MathChar mC : list) {
-            mC.setIsInFraction(false);
             if (mC.getYEnd() < list.get(indexBarreFraction).getYStart())
                 listTopFraction.add(mC);
             else if (mC.getYStart() > list.get(indexBarreFraction).getYEnd())
@@ -272,17 +270,19 @@ public class ImageDecoder {
         }
 
         //S'il y a une possibilité d'avoir une autre fraction : en haut et en bas sinon refaire l'anylse
-        if(listTopFraction.size() >= 3 && isHavingFraction(listTopFraction, tolerenceHeight))
-            line = findFraction(line, listTopFraction, tolerenceHeight);
-        else
-            line += replaceChar(listTopFraction);
+        if(!isHavingFraction(listTopFraction, tolerenceHeight))
+            for(MathChar mC : listTopFraction)
+                mC.setIsInFraction(false);
+
+        line += replaceChar(listTopFraction, originalTolWidth, tolerenceHeight/2);
 
         line += ")/(";
 
-        if(listBottomFraction.size() >= 3 && isHavingFraction(listBottomFraction, tolerenceHeight))
-            line = findFraction(line, listBottomFraction, tolerenceHeight);
-        else
-            line += replaceChar(listBottomFraction);
+        if(!isHavingFraction(listBottomFraction, tolerenceHeight))
+            for(MathChar mC : listBottomFraction)
+                mC.setIsInFraction(false);
+
+        line += replaceChar(listBottomFraction, originalTolWidth, tolerenceHeight/2);
 
         line += ")";
         return line;
