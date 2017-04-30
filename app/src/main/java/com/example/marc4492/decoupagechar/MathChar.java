@@ -17,16 +17,15 @@ public class MathChar {
     private int xMiddle;
     private int yMiddle;
     private int width = 0;
-    private int height = 0;
 
-    private boolean isInFraction = false;
+    private int isInFraction = 0;
 
     private String value = "";
 
     private ArrayList<MathChar> listInner = new ArrayList<>();
     private static ArrayList<MathChar> listFinal = new ArrayList<>();
 
-    public MathChar(Bitmap b, int x, int y, int w, int h, boolean isFrac) {
+    public MathChar(Bitmap b, int x, int y, int w, int h, int isFrac) {
         image = b;
         xStart = x;
         yStart = y;
@@ -40,7 +39,6 @@ public class MathChar {
         yMiddle = (yStart + yEnd)/2;
 
         width = w;
-        height = h;
     }
 
     public Bitmap getImage() {
@@ -80,10 +78,6 @@ public class MathChar {
         return width;
     }
 
-    public int getHeight() {
-        return height;
-    }
-
     public int getXMiddle() {
         return xMiddle;
     }
@@ -92,11 +86,11 @@ public class MathChar {
         return yMiddle;
     }
 
-    public boolean getIsInFraction() {
+    public int getIsInFraction() {
         return isInFraction;
     }
 
-    public void setIsInFraction(boolean inFraction) {
+    public void setIsInFraction(int inFraction) {
         isInFraction = inFraction;
     }
 
@@ -216,10 +210,20 @@ public class MathChar {
                 i++;
             }
 
-            //Probablement une fraction
-            if(listInner.size() > 2)
-                for(MathChar mC : listInner)
-                    mC.isInFraction = true;
+            //Probablement des fractions
+            if(listInner.size() >= 7) {
+                for (MathChar mC : listInner)
+                    mC.isInFraction = isInFraction + 3;
+            }
+            else if(listInner.size() >= 5) {
+                for (MathChar mC : listInner)
+                    mC.isInFraction = isInFraction + 2;
+            }
+            else if(listInner.size() >= 3)
+            {
+                for (MathChar mC : listInner)
+                    mC.isInFraction = isInFraction + 1;
+            }
         }
     }
 

@@ -23,7 +23,6 @@ public class ImageDecoder {
     private String[] charList;
 
     private int originalTolWidth;
-    private int originalTolHeight;
 
     private Context context;
 
@@ -71,7 +70,7 @@ public class ImageDecoder {
             listChar.get(i).setValue(String.valueOf(i));
 
         originalTolWidth = (int) (totalWidth *0.1);
-        originalTolHeight = (int) (totalHeight *0.1);
+        int originalTolHeight = (int) (totalHeight * 0.1);
 
         return postTreatment(replaceChar(listChar, originalTolWidth, originalTolHeight));
     }
@@ -84,15 +83,13 @@ public class ImageDecoder {
      */
     private String replaceChar(ArrayList<MathChar> listChar, int toleranceWidth, int toleranceHeight) {
         String line = "";
-        //10% de l'image
-
         boolean notCheckingLast = false;
         int indexToLook = 0;
         ArrayList<MathChar> listFraction = new ArrayList<>();
 
         //si le premier char n'est pas dans un fraction
         int index;
-        if(!listChar.get(0).getIsInFraction()) {
+        if(listChar.get(0).getIsInFraction() == 0) {
             line += listChar.get(0).getValue();
             index = 1;
         }
@@ -106,11 +103,11 @@ public class ImageDecoder {
                 indexToLook = index - 1;
 
             //Si fraction
-            if(listChar.get(index).getIsInFraction()) {
+            if(listChar.get(index).getIsInFraction() > 0) {
                 notCheckingLast = true;
                 indexToLook = index;
                 listFraction.clear();
-                while (index < listChar.size() && listChar.get(index).getIsInFraction()) {
+                while (index < listChar.size() && listChar.get(index).getIsInFraction() > 0) {
                     listFraction.add(listChar.get(index));
                     index++;
                 }
@@ -165,7 +162,7 @@ public class ImageDecoder {
      */
     private ArrayList<MathChar> splitChar(Bitmap btm) throws IOException
     {
-        MathChar mC = new MathChar(btm, 0, 0, btm.getWidth(), btm.getHeight(), false);
+        MathChar mC = new MathChar(btm, 0, 0, btm.getWidth(), btm.getHeight(), 0);
         mC.splitChar(true);
         return mC.getStaticList();
     }
@@ -251,36 +248,21 @@ public class ImageDecoder {
         ArrayList<MathChar> listTopFraction = new ArrayList<>();
         ArrayList<MathChar> listBottomFraction = new ArrayList<>();
         int indexBarreFraction = 0;
-        boolean haveFraction;
 
-        haveFraction = isHavingFraction(list, tolerenceHeight);
-
-        if(haveFraction)
-            line += "(";
-        else
-            return line;
+        line += "(";
 
 
         //Tri up down de la ligne de fraction
-        for(MathChar mC : list) {
-            if (mC.getYEnd() < list.get(indexBarreFraction).getYStart())
-                listTopFraction.add(mC);
-            else if (mC.getYStart() > list.get(indexBarreFraction).getYEnd())
-                listBottomFraction.add(mC);
+        for(int i = 1; i < list.size(); i++) {
+            list.get(i).setIsInFraction(list.get(i).getIsInFraction() - 1);
+            if (list.get(i).getYEnd() < list.get(indexBarreFraction).getYStart())
+                listTopFraction.add(list.get(i));
+            else if (list.get(i).getYStart() > list.get(indexBarreFraction).getYEnd())
+                listBottomFraction.add(list.get(i));
         }
-
-        //S'il y a une possibilité d'avoir une autre fraction : en haut et en bas sinon refaire l'anylse
-        if(!isHavingFraction(listTopFraction, tolerenceHeight))
-            for(MathChar mC : listTopFraction)
-                mC.setIsInFraction(false);
-
         line += replaceChar(listTopFraction, originalTolWidth, tolerenceHeight/2);
 
         line += ")/(";
-
-        if(!isHavingFraction(listBottomFraction, tolerenceHeight))
-            for(MathChar mC : listBottomFraction)
-                mC.setIsInFraction(false);
 
         line += replaceChar(listBottomFraction, originalTolWidth, tolerenceHeight/2);
 
@@ -292,25 +274,15 @@ public class ImageDecoder {
      * Vérification s'il reste une fraction dans la list
      *
      * @param list                  List à vérifer
-     * @param tolerenceHeight       La tolérence en hauteur pour accepter qu'ils sont un a coté de l'autre
      * @return                      S'il reste une fraction
      */
-    private boolean isHavingFraction(ArrayList<MathChar> list, int tolerenceHeight) {
-        int indexBarreFraction = 0;
-        int countChar = 1;
-        boolean haveFraction = false;
-
-        //Compte le nombre de split qu'il y a eu
-        for(int i = 1; i < list.size(); i++) {
-            if(!isBeside(list.get(indexBarreFraction), list.get(i), tolerenceHeight))
-                countChar++;
-            if(countChar > 2)
-            {
-                haveFraction = true;
-                break;
-            }
+    private ArrayList<MathChar> isHavingFraction(ArrayList<MathChar> list) {
+        ArrayList<MathChar> listFraction = new ArrayList<>();
+        for(int i = 0; i < list.size(); i++) {
+            if(list.get(i).getIsInFraction() == 1)
+                listFraction.add(list.get(i));
         }
-        return haveFraction;
+        return listFraction;
     }
 
     /**

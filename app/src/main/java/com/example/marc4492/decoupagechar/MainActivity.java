@@ -20,7 +20,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             ImageDecoder imageDecoder = new ImageDecoder(this, 0, 0, 0, 0, null, null);
-            t.setText(imageDecoder.findSting(resize(BitmapFactory.decodeResource(getResources(), R.drawable.exposant), 200, 100)));
+            t.setText(imageDecoder.findSting(resize(BitmapFactory.decodeResource(getResources(), R.drawable.exposant), 282, 107)));
         }
         catch (IOException ex)
         {
